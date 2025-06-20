@@ -31,14 +31,71 @@
 
 ## Framework Stages
 
-| Stage | Focus Area | Key Activities |
-|-------|------------|----------------|
-| 0 | Ideation | Raw idea generation |
-| 1 | Signal Gathering | Collect external inputs |
-| 2 | Pattern Recognition | Identify trends |
-| 3 | **Signal Scan** | Deep dive & synthesis |
-| 4 | Prototyping | Build quick tests |
-| 5 | Implementation | Execute best ideas |
+| Stage | Focus Area | Key Activities | Exit Rules |
+|-------|------------|----------------|------------|
+| 0 | Context Seed | Establish project foundation | [Success Today + Primary Constraint](#stage-0-exit-rules) |
+| 1 | Brain Dump | Raw idea generation | [≥3 Key Themes](#stage-1-exit-rules) |
+| 2 | Pattern Recognition | Identify trends | [≥2 Validated Patterns](#stage-2-exit-rules) |
+| 3 | Signal Scan | Deep dive & synthesis | TBD |
+| 4 | Prototyping | Build quick tests | TBD |
+| 5 | Implementation | Execute best ideas | TBD |
+
+## Exit Rules
+
+### Stage 0 Exit Rules
+**To advance**: AI must explicitly restate:
+1. `Success Today: <one-sentence goal>`
+2. `Primary Constraint: <one-sentence limitation>`
+
+**Format Examples**:
+```markdown
+✅ Valid:
+**Success Today:** Ship a Figma prototype
+### Primary Constraint: No coding skills
+
+❌ Invalid:
+"The goal is to build a prototype" (implied)
+```
+
+**Technical Details**:
+- Regex ignores Markdown formatting: `r"\bSuccess Today:\s*.+"`
+- [See implementation](self_evolution_experiment.py#L123)
+
+---
+
+### Stage 1 Exit Rules
+**To advance**: AI must identify ≥3 themes under `Key Themes:`
+
+**Format Examples**:
+```markdown
+✅ Valid:
+Key Themes:
+1. AI education
+- Beginner onboarding
+* Monetization strategies
+
+❌ Invalid:
+Key Themes: Various ideas (no list)
+```
+
+**Visual Guide**:
+```
+[▢] 0-2 themes → ❌ Stay in Stage 1
+[✓] 3+ themes → ✅ Advance to Stage 2
+```
+
+### Stage 2 Exit Rules
+**To advance**: AI must document ≥2 patterns with:
+1. `Pattern 1: <name>`
+2. `Evidence: <examples>`
+3. `Confidence: High/Medium/Low`
+
+**Example**:
+```markdown
+Pattern 1: Fear of technical complexity
+Evidence: "I always get stuck on coding parts"
+Confidence: High
+```
 
 ## Example Workflow
 

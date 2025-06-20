@@ -29,6 +29,66 @@ DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY") or os.getenv("OPENAI_API_KEY")
 MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
 DB_PATH = Path("self_evo_logs.duckdb").resolve()
 
+# ── Updated STAGE_SYSTEM_MESSAGES ────────────────────────────────────────────
+STAGE_SYSTEM_MESSAGES = {
+    '0': (
+        "You are DeepSeek in Stage 0 (Context Seed). Your task is to:\n"
+        "1. Extract the creator's identity, goal, constraint, and creative history.\n"
+        "2. Perform the 30-second Litmus Test by restating:\n"
+        "   Success Today: <one sentence>\n"
+        "   Primary Constraint: <one sentence>\n"
+        "3. If context is unclear, ask for missing details.\n"
+        "Use EXACTLY these headings for parsing."
+    ),
+    '1': "You are DeepSeek in Stage 1 (Brain Dump). Explicitly identify at least 3 distinct themes from the user's raw ideas. Present them under a heading **Key Themes:** using a bulleted or numbered list."
+}
+
+# ── NEW: Exit Rule Check for Stage 1 ─────────────────────────────────────────
+def check_stage1_exit_rule(ai_response: str, min_themes: int = 3) -> tuple[bool, str]:
+    """
+    Checks if the AI identified ≥3 themes in Stage 1.
+    Now supports:
+    - Bullets: "- idea", "* idea"
+    - Numbered: "1. idea", "2) idea"
+    """
+    # Find the "Key Themes:" section
+    themes_section = re.search(r"Key Themes:\s*(.*?)(?=\n\n|\Z)", ai_response, re.DOTALL | re.IGNORECASE)
+    if not themes_section:
+        return False, "❌ No 'Key Themes:' section found."
+    
+    # Count bullets/numbers (supports "-", "*", "1.", "2)", etc.)
+    theme_lines = re.findall(r"^\s*(?:[-*]|\d+[.)])\s+.+", themes_section.group(1), re.MULTILINE)
+    theme_count = len(theme_lines)
+
+    if theme_count >= min_themes:
+        return True, f"✅ Stage 1 Exit Rule Met: {theme_count} themes identified."
+    else:
+        return False, f"❌ Stage 1 Exit Rule Not Met: Only {theme_count} themes (need ≥{min_themes})."
+
+# ── NEW: check_stage0_exit_rule ──────────────────────────────────────────────
+def check_stage0_exit_rule(ai_response: str) -> tuple[bool, str]:
+    """
+    Now ignores Markdown formatting (bold, headers, etc.) before headings.
+    """
+    success = re.search(
+        r"(?:^|\n)\s*(?:[#*>_`-]*\s*)?(?:\*\*|__)?\s*Success Today:\s*.+", 
+        ai_response, 
+        re.I
+    )
+    constraint = re.search(
+        r"(?:^|\n)\s*(?:[#*>_`-]*\s*)?(?:\*\*|__)?\s*Primary Constraint:\s*.+", 
+        ai_response, 
+        re.I
+    )
+    
+    if success and constraint:
+        return True, "✅ Stage 0 Exit Rule Met – context seeded."
+    else:
+        missing = []
+        if not success: missing.append("Success Today")
+        if not constraint: missing.append("Primary Constraint")
+        return False, f"❌ Stage 0 Exit Rule Not Met – missing: {', '.join(missing)}."
+
 # ── Database Setup ───────────────────────────────────────────────────────────
 RUBRIC = [
     ("clarity", "Is the answer clear and understandable?"),
@@ -109,19 +169,25 @@ def self_eval(stage: str, user_prompt: str, ai_response: str) -> tuple[dict, str
     """Enhanced self-evaluation with robust parsing."""
     rubric_str = "\n".join(f"{i+1}. {k}: {v}" for i, (k,v) in enumerate(RUBRIC))
     
+    # Stage-specific evaluation hints
+    stage_hints = {
+        '0': "Special Instruction: Deduct stage_alignment if 'Success Today' or 'Primary Constraint' is missing.",
+        '1': "Special Instruction: Deduct stage_alignment if fewer than 3 themes are listed."
+    }
+    
     messages = [
         {
             "role": "system",
-            "content": (
-                "You are the Ideate‑to‑Create self‑critique module. "
-                "Return ONLY a JSON object with this exact structure:\n"
-                "{\"scores\":{\"clarity\":int,...,\"empathy\":int}, \"patch_note\":str}\n"
-                "Do NOT include markdown fences or commentary."
-            )
+            "content": f"""
+            You are the Ideate-to-Create self-critique module. Evaluate:
+            {rubric_str}
+            {stage_hints.get(stage, '')}
+            Return ONLY JSON: {{"scores": {{...}}, "patch_note": str}}.
+            """
         },
         {
             "role": "user",
-            "content": f"RUBRIC:\n{rubric_str}\n\nSTAGE:{stage}\nPROMPT:\n{user_prompt}\nRESPONSE:\n{ai_response}"
+            "content": f"STAGE:{stage}\nPROMPT:\n{user_prompt}\nRESPONSE:\n{ai_response}"
         }
     ]
 
@@ -170,10 +236,25 @@ def save_interaction(
 # ── Main Execution ───────────────────────────────────────────────────────────
 def main():
     """Enhanced main loop with better error handling."""
-    print(f"🚀 Self-Evolution Experiment v0.5 | DB: {DB_PATH}")
+    print(f"🚀 Self-Evolution Experiment v0.6 | DB: {DB_PATH}")
     
+    # Ensure DB exists
+    CONN.execute("""
+        CREATE TABLE IF NOT EXISTS interactions (
+            id UUID PRIMARY KEY,
+            timestamp TIMESTAMP,
+            stage VARCHAR,
+            user_prompt TEXT,
+            ai_response TEXT,
+            self_scores JSON,
+            patch_note TEXT
+        )
+    """)
+    CONN.commit()
+
     try:
         stage = input("Framework Stage (0‑5): ").strip()
+        system_message_content = STAGE_SYSTEM_MESSAGES.get(stage, "Invalid stage.")
         user_prompt = read_multiline()
         
         if not user_prompt:
@@ -181,7 +262,7 @@ def main():
             
         # Get AI response
         ai_response = chat([
-            {"role": "system", "content": "You are a creative collaborator..."},
+            {"role": "system", "content": system_message_content},
             {"role": "user", "content": user_prompt}
         ])
         
@@ -193,12 +274,26 @@ def main():
         print(f"\n📝 Response length: {len(ai_response)} characters")
         print("="*50 + "\n")
         
+        # Stage-specific exit rules
+        exit_rule_status_message = ""
+        if stage == '0':
+            is_met, msg = check_stage0_exit_rule(ai_response)
+            exit_rule_status_message = msg
+            if not is_met:
+                patch_note = "\n[AI NOTE] Clarify 'Success Today' and 'Primary Constraint'."
+            else:
+                patch_note = "\n🎉 Context seeded. Suggest advancing to Stage 1 (Brain Dump)."
+        elif stage == '1':
+            is_met, msg = check_stage1_exit_rule(ai_response)
+            exit_rule_status_message = msg
+            patch_note = "\n🎉 Suggest advancing to Stage 2." if is_met else "\n[AI NOTE] Improve theme identification."
+
         # Self-evaluation
-        scores, note = self_eval(stage, user_prompt, ai_response)
+        scores, eval_note = self_eval(stage, user_prompt, ai_response)
         
         # Save results
-        save_interaction(stage, user_prompt, ai_response, scores, note)
-        print(f"\n✅ Session saved | Scores: {scores}")
+        save_interaction(stage, user_prompt, ai_response, scores, f"{eval_note} | {patch_note}")
+        print(exit_rule_status_message)
 
     except Exception as e:
         print(f"\n❌ Fatal error: {type(e).__name__}: {e}")
