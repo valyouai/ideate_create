@@ -35,86 +35,92 @@
 |-------|------------|----------------|------------|
 | 0 | Context Seed | Establish project foundation | [Success Today + Primary Constraint](#stage-0-exit-rules) |
 | 1 | Brain Dump | Raw idea generation | [≥3 Key Themes](#stage-1-exit-rules) |
-| 2 | Pattern Recognition | Identify trends | [≥2 Validated Patterns](#stage-2-exit-rules) |
+| 2 | Mind-Trace | Uncover hidden logic | [≥2 Patterns + Core Motivation](#stage-2-exit-rules) |
 | 3 | Signal Scan | Deep dive & synthesis | TBD |
 | 4 | Prototyping | Build quick tests | TBD |
 | 5 | Implementation | Execute best ideas | TBD |
 
 ## Exit Rules
 
-### Stage 0 Exit Rules
-**To advance**: AI must explicitly restate:
+### Stage 0: Context Seed
+**To advance**: AI must restate:
 1. `Success Today: <one-sentence goal>`
 2. `Primary Constraint: <one-sentence limitation>`
 
-**Format Examples**:
+**Format Flexibility**:
+- Supports Markdown (`**Success Today:**`, `### Primary Constraint:`)
+- Case-insensitive (`SUCCESS TODAY:`, `primary constraint:`)
+
+**Example**:
 ```markdown
 ✅ Valid:
-**Success Today:** Ship a Figma prototype
-### Primary Constraint: No coding skills
+**Success Today:** Validate course outline
+> Primary Constraint: Limited to 4 hours/week
 
 ❌ Invalid:
-"The goal is to build a prototype" (implied)
+"The goal is to finish the outline" (implied)
 ```
 
-**Technical Details**:
-- Regex ignores Markdown formatting: `r"\bSuccess Today:\s*.+"`
-- [See implementation](self_evolution_experiment.py#L123)
-
----
-
-### Stage 1 Exit Rules
+### Stage 1: Brain Dump
 **To advance**: AI must identify ≥3 themes under `Key Themes:`
 
-**Format Examples**:
+**Valid Formats**:
 ```markdown
 ✅ Valid:
 Key Themes:
-1. AI education
+1. **AI Education**
 - Beginner onboarding
-* Monetization strategies
+* Monetization
 
 ❌ Invalid:
 Key Themes: Various ideas (no list)
 ```
 
-**Visual Guide**:
-```
-[▢] 0-2 themes → ❌ Stay in Stage 1
-[✓] 3+ themes → ✅ Advance to Stage 2
-```
+**Technical Note**:
+- Regex: `r"Key Themes:.*?(\n\s*[-\*\d].+)+"`
 
-### Stage 2 Exit Rules
-**To advance**: AI must document ≥2 patterns with:
-1. `Pattern 1: <name>`
-2. `Evidence: <examples>`
-3. `Confidence: High/Medium/Low`
+### Stage 2: Mind-Trace
+**To advance**: AI must document:
+1. **≥2 Patterns** with:
+   - `Pattern 1: <name>`
+   - `Evidence: <quotes/examples>`
+   - `Confidence: High/Medium/Low`
+2. **Core Motivation**: `Core Motivation: <one-sentence>`
+3. **Emotional Shift**: `Emotional Shift: <from X to Y>`
 
 **Example**:
 ```markdown
-Pattern 1: Fear of technical complexity
-Evidence: "I always get stuck on coding parts"
+Pattern 1: Problem-Solving as Identity
+Evidence: "I jump from teaching to building tools"
 Confidence: High
+
+Core Motivation: To systematize mastery
+Emotional Shift: Scattered → Focused
 ```
+
+**Technical Notes**:
+- Regex ignores whitespace/Markdown: `r"^\s*Pattern\s*\d+\s*:\s*.+"`
+- [See implementation](self_evolution_experiment.py#L201)
 
 ## Example Workflow
 
 ```plaintext
-1. Select stage (e.g., 3 for Signal Scan)
-2. Enter your prompt (end with EOF)
-3. Receive AI analysis
-4. Automatic self-evaluation
-5. Results saved to database
+1. Select stage (e.g., 2 for Mind-Trace)
+2. Enter prompt (end with EOF):
+   "Why did I jump from X to Y?"
+3. Receive AI analysis with patterns/motivation
+4. Automatic evaluation → "✅ Stage 2 Exit Rule Met"
+5. Results logged to database
 ```
 
 ## Database Schema
 
-Interactions are stored in `self_evo_logs.duckdb` with:
-- Timestamps
-- Stage identifiers
-- Full prompt/response history
-- Evaluation scores
-- Improvement notes
+| Column | Type | Description |
+|--------|------|-------------|
+| `timestamp` | TEXT | Interaction time |
+| `stage` | INT | 0-5 |
+| `exit_rule_met` | BOOL | True/False |
+| `scores` | JSON | Clarity, alignment, etc. |
 
 ## Customization
 
@@ -139,10 +145,11 @@ RUBRIC = [
 
 ## Roadmap
 
-- [ ] Add web interface
-- [ ] Implement team collaboration features
-- [ ] Add visualization dashboard
+- [x] Stage 0-2 exit rules
+- [ ] Stage 3-5 exit rules
+- [ ] Web interface
+- [ ] Team collaboration
 
 ## License
 
-MIT License - Free for personal and commercial use
+MIT License - Free for personal/commercial use
