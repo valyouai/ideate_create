@@ -1,0 +1,16 @@
+README.md
+setup.py
+self_evolution_experiment/__init__.py
+self_evolution_experiment/framework.py
+self_evolution_experiment/main.py
+self_evolution_experiment.egg-info/PKG-INFO
+self_evolution_experiment.egg-info/SOURCES.txt
+self_evolution_experiment.egg-info/dependency_links.txt
+self_evolution_experiment.egg-info/requires.txt
+self_evolution_experiment.egg-info/top_level.txt
+tests/__init__.py
+tests/conftest.py
+tests/test_edge_cases.py
+tests/test_framework_logger.py
+tests/test_integration.py
+tests/test_main.py
